@@ -18,7 +18,7 @@ if (!BOT_TOKEN) {
 const bot = new Telegraf(BOT_TOKEN);
 
 // Game URLs
-const GAME_CLIENT_URL = 'https://warspore-saga.xyz/mobile/index.html';
+const GAME_CLIENT_URL = 'https://warspore-saga.xyz';
 const GAME_DOCS_URL = process.env.GAME_DOCS_URL || 'https://warspore-saga.xyz/docs';
 
 // In-memory storage for verified users (data-free service - resets on restart)
