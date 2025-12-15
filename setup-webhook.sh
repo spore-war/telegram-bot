@@ -50,14 +50,21 @@ echo -e "${YELLOW}   (This will run in the background)${NC}\n"
 npm run webhook:build > webhook.log 2>&1 &
 WEBHOOK_PID=$!
 
-# Wait for server to start
-sleep 3
+# Wait for server to start (retry health)
+HEALTH_OK=false
+for i in {1..5}; do
+  if curl -s http://localhost:${WEBHOOK_PORT}/health > /dev/null; then
+    HEALTH_OK=true
+    break
+  fi
+  echo -e "${YELLOW}Webhook server not ready yet (attempt ${i}/5). Retrying in 3s...${NC}"
+  sleep 3
+done
 
-# Check if server is running
-if ! curl -s http://localhost:${WEBHOOK_PORT}/health > /dev/null; then
-    echo -e "${YELLOW}⚠️  Webhook server failed to start. Check webhook.log${NC}"
-    kill $WEBHOOK_PID 2>/dev/null || true
-    exit 1
+if [ "${HEALTH_OK}" != "true" ]; then
+  echo -e "${YELLOW}⚠️  Webhook server failed to start after retries. Check webhook.log${NC}"
+  kill $WEBHOOK_PID 2>/dev/null || true
+  exit 1
 fi
 
 echo -e "${GREEN}✅ Webhook server is running${NC}\n"

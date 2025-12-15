@@ -5,8 +5,6 @@
   "main": "dist/bot.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/bot.js",
-    "dev": "ts-node src/bot.ts",
     "watch": "tsc --watch",
     "webhook": "ts-node src/webhook-server.ts",
     "webhook:build": "tsc && node dist/webhook-server.js",
