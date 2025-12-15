@@ -18,15 +18,16 @@ if (!BOT_TOKEN) {
 const bot = new Telegraf(BOT_TOKEN);
 
 // Game URLs
-const GAME_CLIENT_URL = 'http://warspore-saga.xyz/mobile/index.html';
-const GAME_DOCS_URL = process.env.GAME_DOCS_URL || 'http://warspore-saga.xyz/docs';
+const GAME_CLIENT_URL = 'https://warspore-saga.xyz/mobile/index.html';
+const GAME_DOCS_URL = process.env.GAME_DOCS_URL || 'https://warspore-saga.xyz/docs';
 
 // In-memory storage for verified users (data-free service - resets on restart)
 const verifiedUsers = new Set<number>();
 const pendingVerifications = new Map<number, { chatId: number; messageId: number; timestamp: number }>();
 
-// Verification timeout (30 minutes)
-const VERIFICATION_TIMEOUT = 30 * 60 * 1000;
+// Verification timeout (30 seconds)
+const VERIFICATION_TIMEOUT = 30 * 1000;
+const VERIFICATION_TIMEOUT_SECONDS = VERIFICATION_TIMEOUT / 1000;
 
 // Clean up expired verifications periodically
 setInterval(() => {
@@ -37,20 +38,21 @@ setInterval(() => {
       console.log(`Removed expired verification for user ${userId}`);
     }
   }
-}, 5 * 60 * 1000); // Check every 5 minutes
+}, 5 * 1000); // Check every 5 seconds
 
 // Verification message template
 const getVerificationMessage = (firstName: string): string => {
-  return `👋 Welcome to Spore War, ${firstName}!\n\n` +
+  return `👋 Welcome to WarSpore～Saga, ${firstName}!\n\n` +
     `🛡️ <b>Verification Required</b>\n\n` +
     `To ensure you're a real person and not a bot, please click the verification button below.\n\n` +
-    `This helps us keep the community safe from automated accounts.`;
+    `This helps us keep the community safe from automated accounts.\n\n` +
+    `⏰ <i>Verification expires in ${VERIFICATION_TIMEOUT_SECONDS} seconds if not completed.</i>`;
 };
 
 // Greeting message template (shown after verification)
 const getGreetingMessage = (firstName: string): string => {
   return `✅ <b>Verification Complete!</b>\n\n` +
-    `👋 Welcome to Spore War, ${firstName}!\n\n` +
+    `👋 Welcome to WarSpore～Saga, ${firstName}!\n\n` +
     `🎮 Ready to dive into the game? Use the buttons below to access the game client or check out the documentation.\n\n` +
     `Have fun and enjoy your adventure! 🚀`;
 };
@@ -81,7 +83,7 @@ const createMainKeyboard = () => {
       ],
       [
         {
-          text: '📚 Documents',
+          text: '📚 Documentations',
           url: GAME_DOCS_URL
         }
       ]
