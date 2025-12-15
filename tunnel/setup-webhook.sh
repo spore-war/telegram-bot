@@ -9,6 +9,13 @@
 
 set -e
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get the project root directory (one level up from script)
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# Change to project root so all paths are relative to it
+cd "${PROJECT_ROOT}"
+
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -38,16 +45,16 @@ WEBHOOK_PORT=${WEBHOOK_PORT:-3000}
 export BOT_TOKEN WEBHOOK_PORT GAME_DOCS_URL
 
 echo -e "${GREEN}📦 Building TypeScript...${NC}"
-# Clean logs for a fresh run
-: > webhook.log
-: > tunnel.log
+# Clean logs for a fresh run (store in tunnel directory)
+: > "${SCRIPT_DIR}/webhook.log"
+: > "${SCRIPT_DIR}/tunnel.log"
 npm run build
 
 echo -e "\n${GREEN}🌐 Starting webhook server on port ${WEBHOOK_PORT}...${NC}"
 echo -e "${YELLOW}   (This will run in the background)${NC}\n"
 
 # Start webhook server in background (fresh log)
-npm run webhook:build > webhook.log 2>&1 &
+npm run webhook:build > "${SCRIPT_DIR}/webhook.log" 2>&1 &
 WEBHOOK_PID=$!
 echo -e "${BLUE}Webhook server PID:${NC} ${WEBHOOK_PID}"
 
@@ -63,7 +70,7 @@ for i in {1..5}; do
 done
 
 if [ "${HEALTH_OK}" != "true" ]; then
-  echo -e "${YELLOW}⚠️  Webhook server failed to start after retries. Check webhook.log${NC}"
+  echo -e "${YELLOW}⚠️  Webhook server failed to start after retries. Check ${SCRIPT_DIR}/webhook.log${NC}"
   kill $WEBHOOK_PID 2>/dev/null || true
   exit 1
 fi
@@ -74,7 +81,7 @@ echo -e "${BLUE}🔗 Creating Cloudflare Tunnel...${NC}"
 echo -e "${YELLOW}   (Will auto-detect the HTTPS URL and set the webhook)${NC}\n"
 
 # Start cloudflared tunnel and log output (fresh log)
-TUNNEL_LOG="tunnel.log"
+TUNNEL_LOG="${SCRIPT_DIR}/tunnel.log"
 cloudflared tunnel --url http://localhost:${WEBHOOK_PORT} > "${TUNNEL_LOG}" 2>&1 &
 TUNNEL_PID=$!
 echo -e "${BLUE}Cloudflare tunnel PID:${NC} ${TUNNEL_PID}"
@@ -112,7 +119,7 @@ for i in {1..5}; do
 done
 
 if [ "${HEALTH_OK}" != "true" ]; then
-  echo -e "${YELLOW}⚠️  Tunnel did not become reachable. Not setting webhook. Check tunnel.log and retry.${NC}"
+  echo -e "${YELLOW}⚠️  Tunnel did not become reachable. Not setting webhook. Check ${TUNNEL_LOG} and retry.${NC}"
   kill $WEBHOOK_PID $TUNNEL_PID 2>/dev/null || true
   exit 1
 fi

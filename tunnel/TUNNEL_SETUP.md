@@ -7,7 +7,7 @@ This guide shows you how to set up a temporary HTTPS tunnel using Cloudflare Tun
 ### Option 1: Automated Script (Recommended)
 
 ```bash
-./setup-webhook.sh
+./tunnel/setup-webhook.sh
 ```
 
 This script will:
@@ -120,6 +120,7 @@ GAME_DOCS_URL=http://warspore-saga.xyz/docs
 - **Server not starting**: Check if port 3000 is already in use
 - **Tunnel connection issues**: Make sure cloudflared is installed and up to date
 - **Bot not responding**: Verify the webhook is set correctly using `getWebhookInfo`
+- **Log files**: Log files (`webhook.log`, `tunnel.log`) are stored in the `tunnel/` directory
 
 ## Switching Back to Polling
 

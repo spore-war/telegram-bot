@@ -1,4 +1,4 @@
-# Spore War Telegram Bot
+# WarSpore ～ Saga Telegram Bot
 
 A Telegram bot that automatically greets new members in your group and provides quick access buttons to the game client and documentation.
 
@@ -9,8 +9,9 @@ A Telegram bot that automatically greets new members in your group and provides 
 - 🚫 Automatically filters out Telegram bot users
 - 🎮 Direct link to game client (after verification)
 - 📚 Direct link to game documentation (after verification)
-- 💬 Commands: `/start` and `/help`
+- 💬 Commands: `/game` and `/help`
 - ✅ Works with Telegram groups and topics
+- 🌐 Webhook-based for production deployment
 
 ## Setup Instructions
 
@@ -49,17 +50,59 @@ npm run build
 
 ### 5. Run the Bot
 
-**Production:**
+**Webhook Mode (Recommended for Production):**
+
+The bot uses webhook mode for better performance and scalability. You have two options:
+
+**Option A: Quick Start (Local Testing with Cloudflare Tunnel)**
 
 ```bash
-npm start
+./tunnel/setup-webhook.sh
 ```
 
-**Development (with auto-reload):**
+This script will:
+
+- Build the TypeScript code
+- Start the webhook server
+- Create a Cloudflare Tunnel for HTTPS access
+- Automatically configure the Telegram webhook
+
+**Option B: Manual Webhook Setup**
+
+1. Start the webhook server:
+
+```bash
+./scripts/start-webhook.sh
+```
+
+This script will:
+
+- Kill any existing process on the configured port
+- Build the TypeScript code
+- Start the webhook server in the background
+- Log output to `webhook.log`
+
+2. Set up HTTPS access (required for Telegram webhooks):
+
+   - Use Cloudflare Tunnel: `cloudflared tunnel --url http://localhost:3000`
+   - Or use your own domain with SSL certificate
+
+3. Configure the Telegram webhook:
+
+```bash
+curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
+  -d "url=https://your-domain.com/webhook"
+```
+
+**Development Mode (Polling):**
+
+For local development without webhook setup:
 
 ```bash
 npm run dev
 ```
+
+> **Note:** Webhook mode is recommended for production. Make sure to disable Privacy Mode in BotFather (`/mybots` → Bot Settings → Group Privacy → Turn off`) so the bot can see all messages in groups.
 
 ## Adding Bot to Your Group
 
@@ -78,8 +121,10 @@ You may need to add the bot to each topic manually, or ensure it has admin permi
 
 ## Bot Commands
 
-- `/start` - Shows welcome message with game links
+- `/game` - Shows welcome message with game links (requires verification in groups)
 - `/help` - Shows help information
+
+> **Note:** In groups, users must complete verification before accessing game links. In private chats, verification is not required.
 
 ## How It Works
 
@@ -109,23 +154,65 @@ The verification system helps prevent automated accounts and spam:
 
 This simple interaction helps filter out program-controlled accounts that can't easily click buttons.
 
-## Alternative Approaches
+## Scripts
 
-The current implementation uses the `new_chat_members` event, which is the standard way to detect new members. However, there are alternative approaches:
+The project includes several utility scripts:
 
-1. **Webhook-based (for production)**: Instead of polling, you can set up webhooks for better performance and scalability
-2. **Welcome message with bot commands**: You can configure a group welcome message that mentions the bot
-3. **Custom welcome messages per topic**: If you have multiple topics, you could customize greetings per topic
+- `./scripts/start-webhook.sh` - Start webhook server (kills existing process, builds, and runs in background)
+- `./scripts/telegram-debug.sh` - Debug Telegram API interactions
+  - `info` - Get webhook info
+  - `delete` - Delete webhook
+  - `updates` - Get pending updates
+  - `ack` - Acknowledge and clear pending updates
+- `./tunnel/setup-webhook.sh` - Full webhook setup with Cloudflare Tunnel (for testing)
 
-If you'd like to explore any of these alternatives, let me know!
+## Project Structure
+
+```
+telegram-bot/
+├── src/
+│   └── webhook-server.ts    # Main bot logic and webhook server
+├── scripts/
+│   ├── start-webhook.sh     # Start webhook server script
+│   └── telegram-debug.sh    # Telegram API debugging tool
+├── tunnel/
+│   ├── setup-webhook.sh      # Full webhook setup with tunnel
+│   └── TUNNEL_SETUP.md      # Tunnel setup documentation
+├── .env                      # Environment variables (create from .env.example)
+├── webhook.log               # Webhook server logs
+└── package.json              # Dependencies and scripts
+```
 
 ## Troubleshooting
 
-- **Bot not greeting members**: Make sure the bot is an admin or has permission to send messages
-- **Bot not responding**: Check that the BOT_TOKEN in `.env` is correct
-- **Buttons not working**: Verify the URLs in the code are correct and accessible
-- **Verification button not working**: Make sure the bot has permission to edit messages
-- **Users not seeing game links**: They need to complete verification first by clicking the verification button
+- **Bot not greeting members**:
+  - Make sure the bot is an admin or has permission to send messages
+  - Disable Privacy Mode in BotFather (`/mybots` → Bot Settings → Group Privacy → Turn off`)
+- **Bot not responding to commands in groups**:
+  - Privacy Mode must be disabled for the bot to see `@botname /game` commands
+  - Check webhook logs: `tail -f webhook.log`
+- **Webhook not receiving updates**:
+  - Verify webhook is set: `./scripts/telegram-debug.sh info`
+  - Check webhook URL is accessible via HTTPS
+  - Check webhook server is running: `./scripts/start-webhook.sh`
+- **Port already in use**:
+  - The `start-webhook.sh` script automatically kills processes on the configured port
+  - Or manually: `lsof -ti:3000 | xargs kill`
+- **Bot not responding**:
+  - Check that BOT_TOKEN in `.env` is correct
+  - Verify webhook server is running and receiving updates
+- **Buttons not working**:
+  - Verify the URLs in the code are correct and accessible
+  - Check `GAME_DOCS_URL` in `.env`
+- **Verification button not working**:
+  - Make sure the bot has permission to edit messages
+  - Check webhook logs for errors
+- **Users not seeing game links**:
+  - They need to complete verification first by clicking the verification button
+  - Verification status resets when the bot restarts (data-free service)
+- **Webhook server crashes**:
+  - Check `webhook.log` for error details
+  - Network timeouts to Telegram API are handled gracefully and won't crash the server
 
 ## License
 

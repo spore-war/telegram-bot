@@ -2,5 +2,6 @@ node_modules/
 dist/
 .env
 *.log
+tunnel/*.log
 .DS_Store
 

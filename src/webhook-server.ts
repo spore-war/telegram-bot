@@ -97,44 +97,31 @@ bot.on('new_chat_members', async (ctx: Context) => {
       : [];
 
     const chatId = ctx.chat?.id;
+    if (!chatId) return;
+
     const chatType = ctx.chat?.type;
     const chatTitle = 'title' in (ctx.chat || {}) ? (ctx.chat as any).title : undefined;
     const messageThreadId = ctx.message && 'message_thread_id' in ctx.message ? ctx.message.message_thread_id : undefined;
-    
-    console.log(`[NEW_MEMBER] Chat: ${chatId} (${chatType})${chatTitle ? ` "${chatTitle}"` : ''}${messageThreadId ? `, Topic: ${messageThreadId}` : ''}, Members: ${newMembers.length}`);
-
-    if (!chatId) return;
 
     for (const member of newMembers) {
-      const memberInfo = {
-        id: member.id,
-        username: member.username || 'N/A',
-        firstName: member.first_name || 'N/A',
-        lastName: member.last_name || 'N/A',
-        isBot: member.is_bot,
-        languageCode: member.language_code || 'N/A'
-      };
-      
-      console.log(`[NEW_MEMBER] Processing: ID=${memberInfo.id}, @${memberInfo.username}, Name="${memberInfo.firstName} ${memberInfo.lastName}", Bot=${memberInfo.isBot}, Lang=${memberInfo.languageCode}`);
-
       // Skip if the new member is the bot itself
       if (member.id === ctx.botInfo?.id) {
-        console.log(`[NEW_MEMBER] Skipping bot itself (${member.id})`);
         continue;
       }
 
       // Skip if the new member is a Telegram bot
       if (member.is_bot) {
-        console.log(`[NEW_MEMBER] Skipping Telegram bot: @${memberInfo.username || memberInfo.firstName || memberInfo.id}`);
         continue;
       }
 
       const userId = member.id;
       const firstName = member.first_name || 'there';
+      const username = member.username || 'N/A';
+      const fullName = `${member.first_name || ''} ${member.last_name || ''}`.trim() || 'N/A';
 
       // Check if user is already verified (in current session)
       if (verifiedUsers.has(userId)) {
-        console.log(`[NEW_MEMBER] User ${userId} (@${memberInfo.username}) already verified, sending greeting`);
+        console.log(`[NEW_MEMBER] User ${userId} (@${username}, "${fullName}") verified → greeting sent | Chat: ${chatId} (${chatType}${chatTitle ? ` "${chatTitle}"` : ''}${messageThreadId ? `, topic=${messageThreadId}` : ''})`);
         // User already verified, send full greeting
         const greeting = getGreetingMessage(firstName);
         const keyboard = createMainKeyboard();
@@ -146,7 +133,6 @@ bot.on('new_chat_members', async (ctx: Context) => {
       }
 
       // Send verification message
-      console.log(`[NEW_MEMBER] User ${userId} (@${memberInfo.username}) not verified, sending verification request`);
       const verificationMsg = getVerificationMessage(firstName);
       const verificationKeyboard = createVerificationKeyboard(userId);
       
@@ -162,7 +148,7 @@ bot.on('new_chat_members', async (ctx: Context) => {
           messageId: sentMessage.message_id,
           timestamp: Date.now()
         });
-        console.log(`[NEW_MEMBER] Verification required for user ${userId} (@${memberInfo.username}, "${firstName}") in chat ${chatId}, message ${sentMessage.message_id}`);
+        console.log(`[NEW_MEMBER] User ${userId} (@${username}, "${fullName}") needs verification | Chat: ${chatId} (${chatType}${chatTitle ? ` "${chatTitle}"` : ''}${messageThreadId ? `, topic=${messageThreadId}` : ''}), msg=${sentMessage.message_id}`);
       }
     }
   } catch (error) {
@@ -170,42 +156,24 @@ bot.on('new_chat_members', async (ctx: Context) => {
   }
 });
 
-// Handle /start command (for direct messages or when users interact with bot)
-bot.command('start', async (ctx: Context) => {
+// Handle /game command (for direct messages or when users interact with bot)
+bot.command('game', async (ctx: Context) => {
   try {
     const userId = ctx.from?.id;
-    if (!userId) {
-      console.log('[CMD /start] No user ID found');
-      return;
-    }
-
-    const userInfo = {
-      id: userId,
-      username: ctx.from?.username || 'N/A',
-      firstName: ctx.from?.first_name || 'N/A',
-      lastName: ctx.from?.last_name || 'N/A',
-      languageCode: ctx.from?.language_code || 'N/A'
-    };
-
-    const chatInfo = {
-      id: ctx.chat?.id,
-      type: ctx.chat?.type,
-      title: 'title' in (ctx.chat || {}) ? (ctx.chat as any).title : undefined,
-      username: 'username' in (ctx.chat || {}) ? (ctx.chat as any).username : undefined,
-      messageThreadId: ctx.message && 'message_thread_id' in ctx.message ? ctx.message.message_thread_id : undefined
-    };
-
-    const isVerified = verifiedUsers.has(userId);
-    console.log(`[CMD /start] User: ID=${userInfo.id}, @${userInfo.username}, Name="${userInfo.firstName} ${userInfo.lastName}", Lang=${userInfo.languageCode}`);
-    console.log(`[CMD /start] Chat: ID=${chatInfo.id}, Type=${chatInfo.type}${chatInfo.title ? `, Title="${chatInfo.title}"` : ''}${chatInfo.username ? `, @${chatInfo.username}` : ''}${chatInfo.messageThreadId ? `, Topic=${chatInfo.messageThreadId}` : ''}`);
-    console.log(`[CMD /start] Verified: ${isVerified}`);
+    if (!userId) return;
 
     const firstName = ctx.from?.first_name || 'there';
+    const username = ctx.from?.username || 'N/A';
+    const fullName = `${ctx.from?.first_name || ''} ${ctx.from?.last_name || ''}`.trim() || 'N/A';
+    const chatId = ctx.chat?.id;
+    const chatType = ctx.chat?.type;
+    const chatTitle = 'title' in (ctx.chat || {}) ? (ctx.chat as any).title : undefined;
+    const messageThreadId = ctx.message && 'message_thread_id' in ctx.message ? ctx.message.message_thread_id : undefined;
+    const isVerified = verifiedUsers.has(userId);
 
     // Check if user is verified (for group context)
     if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
       if (!verifiedUsers.has(userId)) {
-        console.log(`[CMD /start] User ${userId} not verified in group, sending verification`);
         // User not verified, send verification message
         const verificationMsg = getVerificationMessage(firstName);
         const verificationKeyboard = createVerificationKeyboard(userId);
@@ -222,14 +190,13 @@ bot.command('start', async (ctx: Context) => {
             messageId: sentMessage.message_id,
             timestamp: Date.now()
           });
-          console.log(`[CMD /start] Verification message sent: chat=${ctx.chat.id}, message=${sentMessage.message_id}`);
         }
+        console.log(`[CMD /start] User ${userId} (@${username}, "${fullName}") not verified → verification sent | Chat: ${chatId} (${chatType}${chatTitle ? ` "${chatTitle}"` : ''}${messageThreadId ? `, topic=${messageThreadId}` : ''})`);
         return;
       }
     }
 
     // User is verified or in private chat - show full greeting
-    console.log(`[CMD /start] Sending greeting to user ${userId}`);
     const greeting = getGreetingMessage(firstName);
     const keyboard = createMainKeyboard();
 
@@ -237,9 +204,9 @@ bot.command('start', async (ctx: Context) => {
       reply_markup: keyboard,
       parse_mode: 'HTML'
     });
-    console.log(`[CMD /start] Greeting sent successfully to user ${userId}`);
+    console.log(`[CMD /start] User ${userId} (@${username}, "${fullName}") verified=${isVerified} → greeting sent | Chat: ${chatId} (${chatType}${chatTitle ? ` "${chatTitle}"` : ''}${messageThreadId ? `, topic=${messageThreadId}` : ''})`);
   } catch (error) {
-    console.error('[CMD /start] Error handling /start command:', error);
+    console.error('[CMD /start] Error:', error);
   }
 });
 
@@ -284,21 +251,11 @@ bot.action(/^verify_(\d+)$/, async (ctx: Context) => {
     const greeting = getGreetingMessage(firstName);
     const keyboard = createMainKeyboard();
 
-    const userInfo = {
-      id: userId,
-      username: ctx.from?.username || 'N/A',
-      firstName: ctx.from?.first_name || 'N/A',
-      lastName: ctx.from?.last_name || 'N/A'
-    };
-
-    const chatInfo = {
-      id: ctx.chat?.id,
-      type: ctx.chat?.type,
-      title: 'title' in (ctx.chat || {}) ? (ctx.chat as any).title : undefined
-    };
-
-    console.log(`[VERIFY] User verifying: ID=${userInfo.id}, @${userInfo.username}, Name="${userInfo.firstName} ${userInfo.lastName}"`);
-    console.log(`[VERIFY] Chat: ID=${chatInfo.id}, Type=${chatInfo.type}${chatInfo.title ? `, Title="${chatInfo.title}"` : ''}`);
+    const username = ctx.from?.username || 'N/A';
+    const fullName = `${ctx.from?.first_name || ''} ${ctx.from?.last_name || ''}`.trim() || 'N/A';
+    const chatId = ctx.chat?.id;
+    const chatType = ctx.chat?.type;
+    const chatTitle = 'title' in (ctx.chat || {}) ? (ctx.chat as any).title : undefined;
 
     try {
       await ctx.editMessageText(greeting, {
@@ -306,16 +263,15 @@ bot.action(/^verify_(\d+)$/, async (ctx: Context) => {
         parse_mode: 'HTML'
       });
       await ctx.answerCbQuery('✅ Verification successful!');
-      console.log(`[VERIFY] User ${userId} (@${userInfo.username}, "${firstName}") verified successfully in chat ${chatInfo.id}`);
+      console.log(`[VERIFY] User ${userId} (@${username}, "${fullName}") verified → greeting sent | Chat: ${chatId} (${chatType}${chatTitle ? ` "${chatTitle}"` : ''})`);
     } catch (editError) {
-      console.log(`[VERIFY] Edit failed, sending new message instead`);
       // If editing fails, send a new message
       await ctx.reply(greeting, {
         reply_markup: keyboard,
         parse_mode: 'HTML'
       });
       await ctx.answerCbQuery('✅ Verification successful!');
-      console.log(`[VERIFY] User ${userId} (@${userInfo.username}, "${firstName}") verified successfully (via new message) in chat ${chatInfo.id}`);
+      console.log(`[VERIFY] User ${userId} (@${username}, "${fullName}") verified → greeting sent (new msg) | Chat: ${chatId} (${chatType}${chatTitle ? ` "${chatTitle}"` : ''})`);
     }
   } catch (error) {
     console.error('Error handling verification:', error);
@@ -327,33 +283,18 @@ bot.action(/^verify_(\d+)$/, async (ctx: Context) => {
 bot.command('help', async (ctx: Context) => {
   try {
     const userId = ctx.from?.id;
-    if (!userId) {
-      console.log('[CMD /help] No user ID found');
-      return;
-    }
+    if (!userId) return;
 
-    const userInfo = {
-      id: userId,
-      username: ctx.from?.username || 'N/A',
-      firstName: ctx.from?.first_name || 'N/A',
-      lastName: ctx.from?.last_name || 'N/A',
-      languageCode: ctx.from?.language_code || 'N/A'
-    };
-
-    const chatInfo = {
-      id: ctx.chat?.id,
-      type: ctx.chat?.type,
-      title: 'title' in (ctx.chat || {}) ? (ctx.chat as any).title : undefined,
-      username: 'username' in (ctx.chat || {}) ? (ctx.chat as any).username : undefined,
-      messageThreadId: ctx.message && 'message_thread_id' in ctx.message ? ctx.message.message_thread_id : undefined
-    };
-
-    console.log(`[CMD /help] User: ID=${userInfo.id}, @${userInfo.username}, Name="${userInfo.firstName} ${userInfo.lastName}", Lang=${userInfo.languageCode}`);
-    console.log(`[CMD /help] Chat: ID=${chatInfo.id}, Type=${chatInfo.type}${chatInfo.title ? `, Title="${chatInfo.title}"` : ''}${chatInfo.username ? `, @${chatInfo.username}` : ''}${chatInfo.messageThreadId ? `, Topic=${chatInfo.messageThreadId}` : ''}`);
+    const username = ctx.from?.username || 'N/A';
+    const fullName = `${ctx.from?.first_name || ''} ${ctx.from?.last_name || ''}`.trim() || 'N/A';
+    const chatId = ctx.chat?.id;
+    const chatType = ctx.chat?.type;
+    const chatTitle = 'title' in (ctx.chat || {}) ? (ctx.chat as any).title : undefined;
+    const messageThreadId = ctx.message && 'message_thread_id' in ctx.message ? ctx.message.message_thread_id : undefined;
 
     const helpMessage = 
-      `🤖 <b>Spore War Bot Commands</b>\n\n` +
-      `/start - Show welcome message with game links\n` +
+      `🤖 <b>WarSpore～Saga Bot Commands</b>\n\n` +
+      `/game - Show welcome message with game links\n` +
       `/help - Show this help message\n\n` +
       `The bot will automatically greet new members when they join the group!\n\n` +
       `🛡️ <b>Verification System</b>\n` +
@@ -363,9 +304,9 @@ bot.command('help', async (ctx: Context) => {
     await ctx.reply(helpMessage, {
       parse_mode: 'HTML'
     });
-    console.log(`[CMD /help] Help message sent to user ${userId}`);
+    console.log(`[CMD /help] User ${userId} (@${username}, "${fullName}") → help sent | Chat: ${chatId} (${chatType}${chatTitle ? ` "${chatTitle}"` : ''}${messageThreadId ? `, topic=${messageThreadId}` : ''})`);
   } catch (error) {
-    console.error('[CMD /help] Error handling /help command:', error);
+    console.error('[CMD /help] Error:', error);
   }
 });
 
