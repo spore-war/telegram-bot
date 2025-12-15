@@ -49,6 +49,7 @@ echo -e "${YELLOW}   (This will run in the background)${NC}\n"
 # Start webhook server in background (fresh log)
 npm run webhook:build > webhook.log 2>&1 &
 WEBHOOK_PID=$!
+echo -e "${BLUE}Webhook server PID:${NC} ${WEBHOOK_PID}"
 
 # Wait for server to start (retry health)
 HEALTH_OK=false
@@ -76,6 +77,7 @@ echo -e "${YELLOW}   (Will auto-detect the HTTPS URL and set the webhook)${NC}\n
 TUNNEL_LOG="tunnel.log"
 cloudflared tunnel --url http://localhost:${WEBHOOK_PORT} > "${TUNNEL_LOG}" 2>&1 &
 TUNNEL_PID=$!
+echo -e "${BLUE}Cloudflare tunnel PID:${NC} ${TUNNEL_PID}"
 
 # Wait for tunnel URL to appear in the log
 TUNNEL_URL=""
