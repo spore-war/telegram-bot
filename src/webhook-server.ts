@@ -19,23 +19,86 @@ const bot = new Telegraf(BOT_TOKEN);
 
 // Game URLs
 const GAME_CLIENT_URL = 'https://warspore-saga.xyz';
-const GAME_DOCS_URL = process.env.GAME_DOCS_URL || 'https://warspore-saga.xyz/docs';
+const GAME_DOCS_URL = process.env.GAME_DOCS_URL || 'https://www.notion.so/Documentations-2ccc0b9c98708007b6c7c9fa018b06fb';
 
 // In-memory storage for verified users (data-free service - resets on restart)
 const verifiedUsers = new Set<number>();
 const pendingVerifications = new Map<number, { chatId: number; messageId: number; timestamp: number }>();
 
-// Verification timeout (30 seconds)
-const VERIFICATION_TIMEOUT = 30 * 1000;
+// Verification timeout (5 minutes)
+const VERIFICATION_TIMEOUT = 5 * 60 * 1000;
 const VERIFICATION_TIMEOUT_SECONDS = VERIFICATION_TIMEOUT / 1000;
 
 // Clean up expired verifications periodically
-setInterval(() => {
+setInterval(async () => {
   const now = Date.now();
+  const expiredUsers: Array<{ userId: number; chatId: number; messageId: number }> = [];
+  
+  // Collect expired verifications
   for (const [userId, data] of pendingVerifications.entries()) {
     if (now - data.timestamp > VERIFICATION_TIMEOUT) {
+      expiredUsers.push({ userId, chatId: data.chatId, messageId: data.messageId });
       pendingVerifications.delete(userId);
-      console.log(`Removed expired verification for user ${userId}`);
+    }
+  }
+  
+  // Handle each expired user
+  for (const { userId, chatId, messageId } of expiredUsers) {
+    try {
+      // Try to get user info for logging
+      let userInfo = `User ${userId}`;
+      try {
+        const chatMember = await bot.telegram.getChatMember(chatId, userId);
+        if ('user' in chatMember) {
+          const user = chatMember.user;
+          const username = user.username || 'N/A';
+          const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'N/A';
+          userInfo = `User ${userId} (@${username}, "${fullName}")`;
+        }
+      } catch (err) {
+        // User might already be removed, continue anyway
+      }
+      
+      // Send expiration message
+      const expirationMessage = `⏰ <b>Verification Expired</b>\n\n` +
+        `A user failed to complete verification within ${VERIFICATION_TIMEOUT_SECONDS} seconds and has been removed from the group.`;
+      
+      try {
+        await bot.telegram.sendMessage(chatId, expirationMessage, {
+          parse_mode: 'HTML'
+        });
+      } catch (msgError) {
+        console.error(`[EXPIRATION] Failed to send expiration message for ${userInfo} in chat ${chatId}:`, msgError);
+      }
+      
+      // Remove user from group (ban and then unban to kick, or use banChatMember with until_date)
+      try {
+        // Ban the user (this removes them from the group)
+        await bot.telegram.banChatMember(chatId, userId);
+        // Immediately unban so they can rejoin if needed
+        await bot.telegram.unbanChatMember(chatId, userId, { only_if_banned: true });
+        console.log(`[EXPIRATION] Removed expired user ${userInfo} from chat ${chatId}`);
+      } catch (banError: any) {
+        // Check if error is because user is not in group or bot lacks permissions
+        const errorMsg = banError instanceof Error ? banError.message : String(banError);
+        if (errorMsg.includes('not found') || errorMsg.includes('not a member')) {
+          console.log(`[EXPIRATION] User ${userInfo} already not in chat ${chatId}`);
+        } else if (errorMsg.includes('not enough rights') || errorMsg.includes('permission')) {
+          console.error(`[EXPIRATION] Bot lacks permissions to remove user ${userInfo} from chat ${chatId}`);
+        } else {
+          console.error(`[EXPIRATION] Failed to remove user ${userInfo} from chat ${chatId}:`, banError);
+        }
+      }
+      
+      // Try to delete the verification message (optional, may fail if message already deleted)
+      try {
+        await bot.telegram.deleteMessage(chatId, messageId);
+      } catch (deleteError) {
+        // Message might already be deleted, ignore
+      }
+      
+    } catch (error) {
+      console.error(`[EXPIRATION] Error handling expired user ${userId}:`, error);
     }
   }
 }, 5 * 1000); // Check every 5 seconds
