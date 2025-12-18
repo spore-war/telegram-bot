@@ -140,7 +140,7 @@ const createMainKeyboard = () => {
     inline_keyboard: [
       [
         {
-          text: '🎮 Play Now',
+          text: '🎮 Play Now (Testnet)',
           url: GAME_CLIENT_URL
         }
       ],
