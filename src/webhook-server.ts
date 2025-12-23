@@ -21,6 +21,9 @@ const bot = new Telegraf(BOT_TOKEN);
 const GAME_CLIENT_URL = 'https://warspore-saga.xyz';
 const GAME_DOCS_URL = process.env.GAME_DOCS_URL || 'https://www.notion.so/Documentations-2ccc0b9c98708007b6c7c9fa018b06fb';
 
+// Feature flag: allow turning verification on/off without code changes
+const VERIFICATION_ENABLED = process.env.VERIFICATION_ENABLED !== 'false';
+
 // In-memory storage for verified users (data-free service - resets on restart)
 const verifiedUsers = new Set<number>();
 const pendingVerifications = new Map<number, { chatId: number; messageId: number; timestamp: number }>();
@@ -31,6 +34,8 @@ const VERIFICATION_TIMEOUT_SECONDS = VERIFICATION_TIMEOUT / 1000;
 
 // Clean up expired verifications periodically
 setInterval(async () => {
+  if (!VERIFICATION_ENABLED) return;
+
   const now = Date.now();
   const expiredUsers: Array<{ userId: number; chatId: number; messageId: number }> = [];
   
@@ -184,6 +189,18 @@ bot.on('new_chat_members', async (ctx: Context) => {
       const username = member.username || 'N/A';
       const fullName = `${member.first_name || ''} ${member.last_name || ''}`.trim() || 'N/A';
 
+      // If verification is disabled, greet immediately
+      if (!VERIFICATION_ENABLED) {
+        const greeting = getGreetingMessage(firstName);
+        const keyboard = createMainKeyboard();
+        await ctx.reply(greeting, {
+          reply_markup: keyboard,
+          parse_mode: 'HTML'
+        });
+        console.log(`[NEW_MEMBER] User ${userId} (@${username}, "${fullName}") welcomed (verification disabled) | Chat: ${chatId} (${chatType}${chatTitle ? ` "${chatTitle}"` : ''}${messageThreadId ? `, topic=${messageThreadId}` : ''})`);
+        continue;
+      }
+
       // Check if user is already verified (in current session)
       if (verifiedUsers.has(userId)) {
         console.log(`[NEW_MEMBER] User ${userId} (@${username}, "${fullName}") verified → greeting sent | Chat: ${chatId} (${chatType}${chatTitle ? ` "${chatTitle}"` : ''}${messageThreadId ? `, topic=${messageThreadId}` : ''})`);
@@ -235,6 +252,18 @@ bot.command('game', async (ctx: Context) => {
     const chatTitle = 'title' in (ctx.chat || {}) ? (ctx.chat as any).title : undefined;
     const messageThreadId = ctx.message && 'message_thread_id' in ctx.message ? ctx.message.message_thread_id : undefined;
     const isVerified = verifiedUsers.has(userId);
+
+    // If verification is disabled, always allow
+    if (!VERIFICATION_ENABLED) {
+      const greeting = getGreetingMessage(firstName);
+      const keyboard = createMainKeyboard();
+      await ctx.reply(greeting, {
+        reply_markup: keyboard,
+        parse_mode: 'HTML'
+      });
+      console.log(`[CMD /start] User ${userId} (@${username}, "${fullName}") verification disabled → greeting sent | Chat: ${chatId} (${chatType}${chatTitle ? ` "${chatTitle}"` : ''}${messageThreadId ? `, topic=${messageThreadId}` : ''})`);
+      return;
+    }
 
     // Check if user is verified (for group context)
     if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
@@ -292,6 +321,12 @@ bot.action(/^verify_(\d+)$/, async (ctx: Context) => {
     // Verify that the button clicker is the same user who needs verification
     if (callerId !== userId) {
       await ctx.answerCbQuery('❌ This verification is not for you!', { show_alert: true });
+      return;
+    }
+
+    // If verification is disabled, inform the user
+    if (!VERIFICATION_ENABLED) {
+      await ctx.answerCbQuery('✅ Verification is currently disabled.', { show_alert: true });
       return;
     }
 
