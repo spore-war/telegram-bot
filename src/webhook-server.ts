@@ -23,6 +23,7 @@ const GAME_DOCS_URL = process.env.GAME_DOCS_URL || 'https://www.notion.so/Docume
 
 // Feature flag: allow turning verification on/off without code changes
 const VERIFICATION_ENABLED = process.env.VERIFICATION_ENABLED !== 'false';
+console.log(`🛡️  Verification system: ${VERIFICATION_ENABLED ? 'ENABLED ✅' : 'DISABLED ❌'}`);
 
 // In-memory storage for verified users (data-free service - resets on restart)
 const verifiedUsers = new Set<number>();
